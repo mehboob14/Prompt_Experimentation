@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Prompt Tester App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Move Tailwind utility classes directly to the elements in your JS/HTML. */
+    /* If you want to keep custom classes, define them with plain CSS here. */
+    .image-preview {
+      position: relative;
+      display: inline-block;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .remove-icon {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      width: 18px;
+      height: 18px;
+      text-align: center;
+      line-height: 18px;
+    }
+    #conversation h1, 
+    #conversation h2, 
+    #conversation h3 {
+      font-weight: bold;
+      margin-top: 0.5rem;
+      margin-bottom: 0.25rem;
+      font-size: 1.125rem;
+    }
+    #conversation ul {
+      list-style-type: disc;
+      margin-left: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    #conversation p {
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
+    <!-- Input Form -->
+    <div class="md:w-1/3 bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-bold mb-4">Prompt Experimentation</h2>
+      <form id="promptForm" class="space-y-4">
+        <div>
+          <label class="block font-medium mb-1">Dress Description</label>
+          <textarea name="system_message" rows="2" class="w-full border rounded p-2" placeholder="Analyze this dress..."></textarea>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">Prompt 1</label>
+          <textarea name="user_prompt" rows="2" required class="w-full border rounded p-2" placeholder="Ask Anything"></textarea>
+        </div>
+        <div>
+          <label class="block font-medium mb-1">Attach Images</label>
+          <input type="file" id="imageInput" class="block w-full text-sm text-gray-700 border rounded p-2" accept="image/*" multiple>
+          <div id="previewContainer" class="flex flex-wrap mt-2"></div>
+        </div>
+        <button id="submitBtn" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">
+          Submit Prompt
+        </button>
+      </form>
+    </div>
+
+    <div class="md:w-2/3 bg-white rounded-xl shadow p-6 overflow-y-auto h-[80vh]">
+      <h2 class="text-xl font-bold mb-4">Conversation</h2>
+      <div id="conversation" class="space-y-4 text-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('promptForm');
+    const conversationDiv = document.getElementById('conversation');
+    const submitBtn = document.getElementById('submitBtn');
+    const imageInput = document.getElementById('imageInput');
+    const previewContainer = document.getElementById('previewContainer');
+    let imageFiles = [];
+
+    imageInput.addEventListener('change', () => {
+      const files = Array.from(imageInput.files);
+      files.forEach(file => {
+        if (!imageFiles.includes(file)) {
+          imageFiles.push(file);
+          previewImage(file);
+        }
+      });
+      imageInput.value = '';
+    });
+
+    function previewImage(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const container = document.createElement('div');
+        container.classList.add('image-preview');
+
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.classList.add('w-16', 'h-16', 'object-cover', 'rounded');
+
+        const removeBtn = document.createElement('div');
+        removeBtn.innerHTML = '&times;';
+        removeBtn.classList.add('remove-icon');
+        removeBtn.onclick = () => {
+          imageFiles = imageFiles.filter(f => f !== file);
+          container.remove();
+        };
+
+        container.appendChild(img);
+        container.appendChild(removeBtn);
+        previewContainer.appendChild(container);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      formData.append("system_message", form.system_message.value);
+      formData.append("user_prompt", form.user_prompt.value);
+      imageFiles.forEach(file => {
+        formData.append("images", file);
+      });
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Processing...";
+
+      try {
+        const response = await fetch('/generate', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        form.reset();
+        previewContainer.innerHTML = '';
+        imageFiles = [];
+
+        if (data.messages && Array.isArray(data.messages)) {
+          conversationDiv.innerHTML = '';
+          data.messages.forEach(msg => {
+            const div = document.createElement('div');
+            const baseClass = 'p-3 rounded max-w-xl whitespace-pre-wrap';
+
+            if (msg.role === 'user') {
+              div.className = `${baseClass} bg-blue-100 text-left mr-auto text-start`;
+              div.textContent = msg.content;
+            } else {
+              div.className = `${baseClass} bg-gray-200 text-right ml-auto text-start`;
+              div.innerHTML = marked.parse(msg.content);
+            }
+
+            conversationDiv.appendChild(div);
+          });
+
+          conversationDiv.scrollTop = conversationDiv.scrollHeight;
+        }
+
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Something went wrong. Please try again.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Submit Prompt";
+      }
+    });
+  </script>
+</body>
+</html>
