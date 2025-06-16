@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Prompt Tester App</title>
@@ -7,19 +8,18 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Move Tailwind utility classes directly to the elements in your JS/HTML. */
-    /* If you want to keep custom classes, define them with plain CSS here. */
     .image-preview {
       position: relative;
       display: inline-block;
       margin-right: 0.5rem;
       margin-bottom: 0.5rem;
     }
+
     .remove-icon {
       position: absolute;
       top: -6px;
       right: -6px;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0, 0, 0, 0.7);
       color: #fff;
       border-radius: 9999px;
       cursor: pointer;
@@ -29,41 +29,53 @@
       text-align: center;
       line-height: 18px;
     }
-    #conversation h1, 
-    #conversation h2, 
+
+    #conversation h1,
+    #conversation h2,
     #conversation h3 {
       font-weight: bold;
       margin-top: 0.5rem;
       margin-bottom: 0.25rem;
       font-size: 1.125rem;
     }
+
     #conversation ul {
       list-style-type: disc;
       margin-left: 1.25rem;
       margin-bottom: 0.5rem;
     }
+
     #conversation p {
       margin-bottom: 0.5rem;
     }
+
+    #sidebar {
+      max-width: 16rem;
+    }
   </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen p-4">
+
   <div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
     <!-- Input Form -->
     <div class="md:w-1/3 bg-white rounded-xl shadow p-6">
-      <h2 class="text-xl font-bold mb-4">Prompt Experimentation</h2>
+      <h2 class="text-xl font-bold mb-4">Prompt Tester</h2>
       <form id="promptForm" class="space-y-4">
         <div>
           <label class="block font-medium mb-1">Dress Description</label>
-          <textarea name="system_message" rows="2" class="w-full border rounded p-2" placeholder="Analyze this dress..."></textarea>
+          <textarea name="system_message" rows="2" class="w-full border rounded p-2"
+            placeholder="Analyze this dress..."></textarea>
         </div>
         <div>
           <label class="block font-medium mb-1">Prompt 1</label>
-          <textarea name="user_prompt" rows="2" required class="w-full border rounded p-2" placeholder="Ask Anything"></textarea>
+          <textarea name="user_prompt" rows="2" required class="w-full border rounded p-2"
+            placeholder="Ask Anything"></textarea>
         </div>
         <div>
           <label class="block font-medium mb-1">Attach Images</label>
-          <input type="file" id="imageInput" class="block w-full text-sm text-gray-700 border rounded p-2" accept="image/*" multiple>
+          <input type="file" id="imageInput" class="block w-full text-sm text-gray-700 border rounded p-2"
+            accept="image/*" multiple>
           <div id="previewContainer" class="flex flex-wrap mt-2"></div>
         </div>
         <button id="submitBtn" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">
@@ -72,10 +84,16 @@
       </form>
     </div>
 
+    <!-- Conversation Output -->
     <div class="md:w-2/3 bg-white rounded-xl shadow p-6 overflow-y-auto h-[80vh]">
       <h2 class="text-xl font-bold mb-4">Conversation</h2>
       <div id="conversation" class="space-y-4 text-sm"></div>
     </div>
+      <!-- Floating Button -->
+  <button id="newConversationBtn"
+    class="fixed bottom-4 right-4 bg-red-500 text-white text-sm px-3 py-1.5 rounded shadow hover:bg-red-600">
+    New Chat
+  </button>
   </div>
 
   <script>
@@ -84,6 +102,7 @@
     const submitBtn = document.getElementById('submitBtn');
     const imageInput = document.getElementById('imageInput');
     const previewContainer = document.getElementById('previewContainer');
+    const newConversationBtn = document.getElementById('newConversationBtn');
     let imageFiles = [];
 
     imageInput.addEventListener('change', () => {
@@ -174,6 +193,16 @@
         submitBtn.innerText = "Submit Prompt";
       }
     });
+
+   newConversationBtn.addEventListener('click', () => {
+      conversationDiv.innerHTML = '';
+      form.reset();
+      previewContainer.innerHTML = '';
+      imageFiles = [];
+      fetch('/reset-session', { method: 'POST' });
+    });
   </script>
+
 </body>
+
 </html>

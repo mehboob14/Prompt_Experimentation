@@ -13,13 +13,15 @@ import cv2 as cv
 
 app = Flask(__name__)
 
-API= os.getenv('OPENAI_API_KEY')
+API = os.getenv("OPENAI_API_KEY")
+if not API:
+    raise ValueError("OPENAI_API_KEY not set in environment variables")
 
 llm = ChatOpenAI(
     model="gpt-4.1",
     openai_api_key=API,
     temperature=0.5,
-    max_tokens=2000
+    max_tokens=20000
 )
 
 system_message = SystemMessage(
@@ -111,6 +113,10 @@ def generate():
                 os.remove(path)
             except Exception as e:
                 print(f"Failed to delete temp file {path}: {e}")
-
+@app.route('/reset-session', methods=['POST'])
+def reset_session():
+    global memory
+    memory.clear()
+    return jsonify({"status": "session reset"})
 if __name__ == '__main__':
     app.run(debug=True)
