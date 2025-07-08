@@ -12,7 +12,6 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 import cv2 as cv
 
 app = Flask(__name__)
-
 API = os.getenv("OPENAI_API_KEY")
 if not API:
     raise ValueError("OPENAI_API_KEY not set in environment variables")

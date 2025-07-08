@@ -142,7 +142,8 @@
 
       const formData = new FormData();
       const userPromptText = form.user_prompt.value;
-      formData.append("system_message", form.system_message.value);
+      const systemMessageText = form.system_message.value;
+      formData.append("system_message", systemMessageText);
       formData.append("user_prompt", userPromptText);
       imageFiles.forEach(file => {
         formData.append("images", file);
@@ -159,10 +160,12 @@
 
         const data = await response.json();
 
-        const userDiv = document.createElement('div');
-        userDiv.className = 'p-3 rounded max-w-xl whitespace-pre-wrap bg-blue-100 text-left mr-auto text-start';
-        userDiv.textContent = userPromptText;
-        conversationDiv.appendChild(userDiv);
+        if (userPromptText.trim()) {
+          const userDiv = document.createElement('div');
+          userDiv.className = 'p-3 rounded max-w-xl whitespace-pre-wrap bg-blue-100 text-left mr-auto text-start';
+          userDiv.textContent = userPromptText;
+          conversationDiv.appendChild(userDiv);
+        }
 
         const assistantDiv = document.createElement('div');
         assistantDiv.className = 'p-3 rounded max-w-xl whitespace-pre-wrap bg-gray-200 text-right ml-auto text-start';
@@ -171,7 +174,7 @@
 
         conversationDiv.scrollTop = conversationDiv.scrollHeight;
 
-        form.reset();
+        form.user_prompt.value = "";
         previewContainer.innerHTML = '';
         imageFiles = [];
 
