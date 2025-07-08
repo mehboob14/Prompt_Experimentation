@@ -1,14 +1,14 @@
 import os
 import uuid
 import base64
+import re
+import json
 from io import BytesIO
 from PIL import Image
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain.schema import HumanMessage, AIMessage
-from langchain_core.messages import SystemMessage
+from langchain.schema import HumanMessage, AIMessage, SystemMessage
 import cv2 as cv
 
 app = Flask(__name__)
@@ -20,28 +20,28 @@ if not API:
 llm = ChatOpenAI(
     model="gpt-4.1",
     openai_api_key=API,
-    temperature=0.5,
+    temperature=0,
     max_tokens=20000
 )
-
-system_message = SystemMessage(
-    content=(
-        ""
-    )
-)
-
-memory = ConversationBufferMemory(memory_key="history", return_messages=True)
 
 TEMP_DIR = "temp_uploads"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# Util: Encode image at path to base64
 def encode_image(image_path):
     image = cv.imread(image_path)
     if image is None:
         raise ValueError(f"Could not load image at path: {image_path}")
     _, buffer = cv.imencode(".jpg", image)
     return base64.b64encode(buffer).decode("utf-8")
+
+def extract_json_response(raw):
+    try:
+        match = re.search(r'\{.*"output"\s*:\s*".*?".*?\}', raw, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+    except Exception:
+        pass
+    return {"output": "unknown", "summary": raw.strip()}
 
 @app.route('/')
 def index():
@@ -50,11 +50,7 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate():
     user_prompt = request.form.get('user_prompt', '')
-    system_prompt = request.form.get('system_message', '')
     image_files = request.files.getlist('images')
-
-    if system_prompt and len(memory.chat_memory.messages) == 0:
-        memory.chat_memory.add_message(SystemMessage(content=system_prompt))
 
     user_msg_content = []
     temp_paths = []
@@ -77,35 +73,23 @@ def generate():
             except Exception as e:
                 print(f"Image encoding error: {e}")
 
-    if user_prompt:
-        user_msg_content.append({
-            "type": "text",
-            "text": user_prompt
-        })
+    user_msg_content.append({
+        "type": "text",
+        "text": f"""{user_prompt}\n\nRespond only in strict JSON format:\n{{\n  \"output\": \"yes\" or \"no\",\n  \"summary\": \"reasoning\"\n}}"""
+    })
 
     try:
-        full_messages = [system_message] + memory.load_memory_variables({})["history"] + [
-            HumanMessage(content=user_msg_content)
-        ]
-        response = llm.invoke(full_messages)
+        messages = []
+        messages.append(HumanMessage(content=user_msg_content))
+        response = llm.invoke(messages)
+        messages.append(AIMessage(content=response.content))
 
-        memory.chat_memory.add_user_message(HumanMessage(content=user_msg_content))
-        memory.chat_memory.add_ai_message(AIMessage(content=response.content))
+        parsed = extract_json_response(response.content)
 
-        output = []
-        for msg in memory.chat_memory.messages:
-            if isinstance(msg, HumanMessage):
-                items = []
-                for item in msg.content:
-                    if item.get("type") == "image_url":
-                        items.append("[Image attached]")
-                    elif item.get("type") == "text":
-                        items.append(item.get("text"))
-                output.append({"role": "user", "content": "\n".join(items)})
-            elif isinstance(msg, AIMessage):
-                output.append({"role": "assistant", "content": msg.content})
-
-        return jsonify({"messages": output})
+        return jsonify({
+            "output": parsed.get("output", "unknown"),
+            "summary": parsed.get("summary", response.content.strip())
+        })
 
     finally:
         for path in temp_paths:
@@ -113,10 +97,10 @@ def generate():
                 os.remove(path)
             except Exception as e:
                 print(f"Failed to delete temp file {path}: {e}")
+
 @app.route('/reset-session', methods=['POST'])
 def reset_session():
-    global memory
-    memory.clear()
     return jsonify({"status": "session reset"})
+
 if __name__ == '__main__':
     app.run(debug=True)
